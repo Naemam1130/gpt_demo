@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ChatGPT WebSocket Demo</title>
+    <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 20px;
+          text-align: center;
+        }
+        #chat-container {
+          width: 90%;
+          max-width: 500px;
+          margin: auto;
+        }
+        #chat-box {
+          border: 1px solid #ccc;
+          border-radius: 5px;
+          padding: 10px;
+          height: 300px;
+          overflow-y: scroll;
+          background: #f9f9f9;
+        }
+        .message {
+          padding: 5px;
+          margin: 5px 0;
+          border-radius: 5px;
+        }
+        .user {
+          text-align: right;
+          background: #4caf50;
+          color: white;
+        }
+        .assistant {
+          text-align: left;
+          background: #ddd;
+        }
+        #user-input {
+          width: 70%;
+          padding: 10px;
+          border: 1px solid #ccc;
+          border-radius: 5px;
+        }
+        #send-btn {
+          padding: 10px 15px;
+          border: none;
+          border-radius: 5px;
+          background: #4caf50;
+          color: white;
+          cursor: pointer;
+        }
+        #user-id-input {
+          width: 60%;
+          padding: 10px;
+          margin-bottom: 10px;
+          border: 1px solid #ccc;
+          border-radius: 5px;
+        }
+        #connect-btn {
+          width: 15%;
+          padding: 10px 15px;
+          border: none;
+          border-radius: 5px;
+          background: #008CBA;
+          color: white;
+          cursor: pointer;
+        }
+        #delete-btn {
+          width: 15%;
+          padding: 10px 15px;
+          border: none;
+          border-radius: 5px;
+          background: #ff4040;
+          color: white;
+          cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>ChatGPT WebSocket Demo</h1>
+    <div id="chat-container">
+        <input type="text" id="user-id-input" placeholder="Enter User ID" />
+        <button id="connect-btn">Load</button>
+        <button id="delete-btn">Delete</button>
+        
+        <div id="chat-box"></div>
+        
+        <input type="text" id="user-input" placeholder="Type your message..." />
+        <button id="send-btn">Send</button>
+    </div>
+
+    <script>
+        // WebSocket 연결 설정
+        var socket = new WebSocket("ws://localhost:8000/ws");
+
+        
+
+        document.getElementById("send-btn").addEventListener("click", () => {
+          sendMessage();
+        });
+
+        document.getElementById("connect-btn").addEventListener("click", () => {
+          getHistory();
+        });
+
+        document.getElementById("delete-btn").addEventListener("click", () => {
+          deleteHistory();
+        });
+
+        document.getElementById("user-input").addEventListener("keypress", (event) => {
+            if (event.key === "Enter") {
+                sendMessage();
+            }
+        });
+
+        function sendMessage(event) {
+        // send 버튼 누를 시시
+          const userId = document.getElementById("user-id-input").value;
+
+          if (!userId) {
+                alert("Please enter a User ID.");
+                return;
+            }
+          const inputField = document.getElementById("user-input");
+          const message = inputField.value;
+            // 입력 텍스트 표시
+            appendMessage("user", message);
+
+            // 텍스트 전송
+            socket.send(JSON.stringify({
+                msg_type: 'Send',
+                user_id: userId,
+                messages: [{ role: "user", content: message }]
+            }));
+
+            // stream 텍스트 수신
+            socket.onmessage = function(event) {
+              const data = JSON.parse(event.data);
+              
+              if (data['msg_type'] == 'Send'){
+                // stream 시작
+                if (data['msg'] == '[START]'){
+                  appendMessage("assistant", '');
+                // chunk text 추가
+                } else {
+                  addMessage("assistant", data['msg']);
+                }
+              }
+            };
+
+            inputField.value = "";
+        }
+        // load 버튼튼
+        function getHistory(event) {
+          const userId = document.getElementById("user-id-input").value;
+          if (!userId) {
+                alert("Please enter a User ID.");
+                return;
+            }
+          // 대화내역 검색할 id 전송
+          socket.send(JSON.stringify({
+            msg_type: 'History',
+            user_id: userId
+          }));
+          // 대화 내역 텍스트 표시
+          socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data['msg_type'] == 'History'){
+              for (msg of data['msg']) {
+                appendMessage(msg['role'], msg['content'])
+              }
+            }
+          };
+        }
+        // delete 버튼
+        function deleteHistory(event) {
+          const userId = document.getElementById("user-id-input").value;
+          if (!userId) {
+                alert("Please enter a User ID.");
+                return;
+            }
+          // 대화내역 제거할 id 전송
+          socket.send(JSON.stringify({
+            msg_type: 'Delete',
+            user_id: userId
+          }));
+
+          // 표시된 텍스트 제거
+          socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data['msg_type'] == 'Delete'){
+              if (data['msg'] == 'Success') {
+                const chatBox = document.getElementById("chat-box")
+                chatBox.innerHTML = ''
+              }
+            }
+          };
+        }
+        // 대화창 추가
+        function appendMessage(role, text) {
+          const chatBox = document.getElementById("chat-box");
+          const msgDiv = document.createElement("div");
+          msgDiv.className = "message " + role;
+          msgDiv.textContent = (role === "user" ? "You: " : "ChatGPT: ") + text;
+          chatBox.appendChild(msgDiv);
+          chatBox.scrollTop = chatBox.scrollHeight;
+        }
+        // 대화창에 chunk 추가
+        function addMessage(role, text) {
+          const chatBox = document.getElementById("chat-box");
+          chatBox.lastElementChild.textContent += text
+          chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+
+</body>
+</html>
