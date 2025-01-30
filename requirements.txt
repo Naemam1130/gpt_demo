@@ -1,0 +1,10 @@
+aiohttp==3.11.11
+asyncio==3.4.3
+chromadb==0.6.3
+fastapi==0.115.7
+kiwipiepy==0.20.3
+numpy==2.2.2
+openai==1.60.1
+tokenizers==0.21.0
+uvicorn==0.34.0
+
